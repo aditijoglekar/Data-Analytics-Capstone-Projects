@@ -1,0 +1,22 @@
+# SQL E-Commerce Analytics Project
+
+## Overview
+Analyzed 541K+ transaction records using 15 advanced SQL queries
+
+## Key Metrics
+- Total Revenue: $10.67M
+- Total Customers: 4,373
+- Total Orders: 22K
+- Repeat Customer Rate: 99.50%
+
+## What's Included
+- 15 SQL queries covering RFM analysis, CLV, churn detection, revenue trends
+- Top 20 customers by spending
+- Top 15 products by revenue
+- Customer segmentation (VIP/Gold/Regular/At-Risk)
+- Monthly trends and seasonal patterns
+
+## Key Insights
+✓ Top 26% of customers generate 80% of revenue
+✓ 99.50% of customers make repeat purchases
+✓ Orders distributed across Low/Medium/High price segments
