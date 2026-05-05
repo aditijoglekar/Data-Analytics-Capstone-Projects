@@ -1,0 +1,358 @@
+-- QUERY 1: Total Revenue & Business Metrics
+SELECT 
+    COUNT(DISTINCT InvoiceNo) as total_orders,
+    COUNT(DISTINCT CustomerID) as total_customers,
+    COUNT(DISTINCT StockCode) as total_products,
+    SUM(CAST(Quantity AS INT)) as total_items_sold,
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_revenue,
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value
+FROM MyDatabase.dbo.online_retail
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0;
+
+--QUERY 2 Top 10 Products by Revenue
+SELECT 
+    TOP 10 StockCode, 
+    Description, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    SUM(CAST(Quantity AS INT)) as total_qty, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 GROUP BY StockCode, 
+Description 
+ORDER BY total_revenue DESC;
+
+--QUERY 3 Top 20 Customers by Spending 
+SELECT 
+    TOP 20 CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_spent, 
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID ORDER BY total_spent DESC;
+
+--QUERY 4 Monthly Revenue Trend 
+SELECT 
+    YEAR(CAST(InvoiceDate AS DATETIME)) as year, 
+    MONTH(CAST(InvoiceDate AS DATETIME)) as month, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as monthly_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+GROUP BY YEAR(CAST(InvoiceDate AS DATETIME)), MONTH(CAST(InvoiceDate AS DATETIME)) 
+ORDER BY year, month DESC;
+
+--QUERY 5 Revenue by Country 
+SELECT 
+    TOP 15 Country, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    COUNT(DISTINCT CustomerID) as num_customers, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+GROUP BY Country ORDER BY total_revenue DESC;
+
+--QUERY 6 Customer Purchase Frequency 
+SELECT 
+    CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as purchase_frequency, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_spent, 
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID 
+ORDER BY purchase_frequency DESC;
+
+--QUERY 7 Customer Lifetime Value (CLV) 
+SELECT 
+    TOP 30 CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as total_orders, 
+    COUNT(DISTINCT StockCode) as distinct_products, 
+    MIN(CAST(InvoiceDate AS DATETIME)) as first_purchase, 
+    MAX(CAST(InvoiceDate AS DATETIME)) as last_purchase, 
+    DATEDIFF(DAY, MIN(CAST(InvoiceDate AS DATETIME)), 
+    MAX(CAST(InvoiceDate AS DATETIME))) as customer_lifetime_days,
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as customer_lifetime_value 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID 
+ORDER BY customer_lifetime_value DESC;
+
+--QUERY 8 RFM Segmentation 
+WITH rfm AS 
+(   SELECT CustomerID, DATEDIFF(DAY, MAX(CAST(InvoiceDate AS DATETIME)), '2011-12-09') 
+    as recency, COUNT(DISTINCT InvoiceNo) as frequency, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as monetary 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+    GROUP BY CustomerID ) 
+    SELECT CustomerID, recency, frequency, monetary, 
+    CASE    WHEN recency <= 30 AND frequency >= 5 AND monetary >= 1000 
+            THEN 'VIP' 
+            WHEN recency <= 90 AND frequency >= 3 AND monetary >= 500 
+            THEN 'Gold' 
+            WHEN recency > 180 OR frequency = 1 
+            THEN 'At-Risk' 
+            ELSE 'Regular' 
+            END as customer_segment 
+            FROM rfm 
+            ORDER BY monetary DESC;
+
+--QUERY 9 Repeat Purchase Rate 
+WITH customer_orders AS 
+(   SELECT CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as num_orders 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+    GROUP BY CustomerID ) 
+  SELECT SUM(CASE WHEN num_orders >= 2 THEN 1 ELSE 0 END) as repeat_customers, 
+         SUM(CASE WHEN num_orders = 1 THEN 1 ELSE 0 END) as one_time_customers, 
+         COUNT(*) as total_customers, 
+         ROUND(SUM(CASE WHEN num_orders >= 2 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as repeat_rate_pct 
+         FROM customer_orders;
+
+--QUERY 10 Customer Concentration (80/20 Rule) 
+WITH customer_revenue AS ( SELECT CustomerID, 
+ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as customer_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID ), ranked AS ( SELECT CustomerID, customer_revenue, 
+SUM(customer_revenue) OVER (ORDER BY customer_revenue DESC) as running_total, 
+(SELECT SUM(customer_revenue) FROM customer_revenue) as total_revenue, 
+CAST(100.0 * SUM(customer_revenue) 
+OVER (ORDER BY customer_revenue DESC) / (SELECT SUM(customer_revenue) 
+FROM customer_revenue) AS DECIMAL(5,2)) as cumulative_pct FROM customer_revenue ) 
+SELECT TOP 1 COUNT(DISTINCT CustomerID) as top_customers_for_80pct, 
+ROUND(AVG(customer_revenue), 2) as avg_customer_value 
+FROM ranked 
+WHERE cumulative_pct <= 80;
+
+--QUERY 11 Inactive Customers (Churn Risk) 
+WITH last_purchase AS 
+( 
+    SELECT CustomerID, MAX(CAST(InvoiceDate AS DATETIME)) as last_purchase_date 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+    GROUP BY CustomerID ) 
+    SELECT COUNT(*) as inactive_90days, 
+    COUNT(CASE WHEN DATEDIFF(DAY, last_purchase_date, '2011-12-09') > 180 THEN 1 END) as inactive_180days, 
+    COUNT(CASE WHEN DATEDIFF(DAY, last_purchase_date, '2011-12-09') > 365 THEN 1 END) as inactive_1year 
+    FROM last_purchase WHERE DATEDIFF(DAY, last_purchase_date, '2011-12-09') > 90;
+
+--QUERY 12 Top 15 Products by Revenue 
+SELECT TOP 15 StockCode, Description, 
+COUNT(DISTINCT InvoiceNo) as num_orders, 
+SUM(CAST(Quantity AS INT)) as qty_sold, 
+ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+GROUP BY StockCode, 
+Description 
+ORDER BY revenue DESC;
+
+-- QUERY 13: Order Value Distribution
+SELECT 
+    ROUND(MIN(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as min_order_value,
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value,
+    ROUND(MAX(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as max_order_value,
+    COUNT(*) as total_line_items
+FROM MyDatabase.dbo.online_retail
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0;
+
+--QUERY 14 Orders per Month Trend 
+SELECT YEAR(CAST(InvoiceDate AS DATETIME)) as year, 
+MONTH(CAST(InvoiceDate AS DATETIME)) as month, 
+COUNT(DISTINCT InvoiceNo) as num_orders, 
+COUNT(DISTINCT CustomerID) as num_customers, 
+ROUND(COUNT(DISTINCT InvoiceNo) * 1.0 / COUNT(DISTINCT CustomerID), 2) as orders_per_customer 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY YEAR(CAST(InvoiceDate AS DATETIME)), 
+MONTH(CAST(InvoiceDate AS DATETIME)) 
+ORDER BY year DESC, month DESC;
+
+--QUERY 15 Order Value Segments (Low/Medium/High) Shows: How orders split between price ranges
+SELECT 
+    CASE WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 50 
+    THEN 'Low (< 50)' 
+    WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 200 
+    THEN 'Medium (50-200)' ELSE 'High (> 200)' END as order_value_segment, 
+    COUNT(*) as num_line_items, 
+    COUNT(DISTINCT InvoiceNo) as distinct_orders, 
+    COUNT(DISTINCT CustomerID) as num_customers, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as segment_revenue 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+    GROUP BY CASE WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 50 
+    THEN 'Low (< 50)' 
+    WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 200 
+    THEN 'Medium (50-200)' ELSE 'High (> 200)' END 
+    ORDER BY segment_revenue DESC;
+
+--QUERY 3 Top 20 Customers by Spending Shows: Your biggest spenders
+SELECT 
+    TOP 20 CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_spent, 
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID ORDER BY total_spent DESC;
+
+--QUERY 4 Monthly Revenue Trend Shows: How revenue changed month by month
+SELECT 
+    YEAR(CAST(InvoiceDate AS DATETIME)) as year, 
+    MONTH(CAST(InvoiceDate AS DATETIME)) as month, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as monthly_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+GROUP BY YEAR(CAST(InvoiceDate AS DATETIME)), MONTH(CAST(InvoiceDate AS DATETIME)) 
+ORDER BY year, month DESC;
+
+--QUERY 5 Revenue by Country (Top 15) Shows: Which countries buy the most
+SELECT 
+    TOP 15 Country, 
+    COUNT(DISTINCT InvoiceNo) as num_orders, 
+    COUNT(DISTINCT CustomerID) as num_customers, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+GROUP BY Country ORDER BY total_revenue DESC;
+
+--QUERY 6 Customer Purchase Frequency Shows: How many times each customer bought
+SELECT 
+    CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as purchase_frequency, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as total_spent, 
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID 
+ORDER BY purchase_frequency DESC;
+
+--QUERY 7 Customer Lifetime Value (CLV) Shows: Top 30 customers by total lifetime spending
+SELECT 
+    TOP 30 CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as total_orders, 
+    COUNT(DISTINCT StockCode) as distinct_products, 
+    MIN(CAST(InvoiceDate AS DATETIME)) as first_purchase, 
+    MAX(CAST(InvoiceDate AS DATETIME)) as last_purchase, 
+    DATEDIFF(DAY, MIN(CAST(InvoiceDate AS DATETIME)), 
+    MAX(CAST(InvoiceDate AS DATETIME))) as customer_lifetime_days,
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as customer_lifetime_value 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID 
+ORDER BY customer_lifetime_value DESC;
+
+--QUERY 8 ⭐ RFM Segmentation (MOST IMPORTANT) Shows: Customer segments (VIP, Gold, Regular, At-Risk)
+WITH rfm AS 
+(   SELECT CustomerID, DATEDIFF(DAY, MAX(CAST(InvoiceDate AS DATETIME)), '2011-12-09') 
+    as recency, COUNT(DISTINCT InvoiceNo) as frequency, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as monetary 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+    GROUP BY CustomerID ) 
+    SELECT CustomerID, recency, frequency, monetary, 
+    CASE    WHEN recency <= 30 AND frequency >= 5 AND monetary >= 1000 
+            THEN 'VIP' 
+            WHEN recency <= 90 AND frequency >= 3 AND monetary >= 500 
+            THEN 'Gold' 
+            WHEN recency > 180 OR frequency = 1 
+            THEN 'At-Risk' 
+            ELSE 'Regular' 
+            END as customer_segment 
+            FROM rfm 
+            ORDER BY monetary DESC;
+
+--QUERY 9 Repeat Purchase Rate Shows: % of customers who buy more than once (loyalty metric)
+WITH customer_orders AS 
+(   SELECT CustomerID, 
+    COUNT(DISTINCT InvoiceNo) as num_orders 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+    GROUP BY CustomerID ) 
+  SELECT SUM(CASE WHEN num_orders >= 2 THEN 1 ELSE 0 END) as repeat_customers, 
+         SUM(CASE WHEN num_orders = 1 THEN 1 ELSE 0 END) as one_time_customers, 
+         COUNT(*) as total_customers, 
+         ROUND(SUM(CASE WHEN num_orders >= 2 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as repeat_rate_pct 
+         FROM customer_orders;
+
+--QUERY 10 Customer Concentration (80/20 Rule) Shows: How many customers make up 80% of revenue
+WITH customer_revenue AS ( SELECT CustomerID, 
+ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as customer_revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY CustomerID ), ranked AS ( SELECT CustomerID, customer_revenue, 
+SUM(customer_revenue) OVER (ORDER BY customer_revenue DESC) as running_total, 
+(SELECT SUM(customer_revenue) FROM customer_revenue) as total_revenue, 
+CAST(100.0 * SUM(customer_revenue) 
+OVER (ORDER BY customer_revenue DESC) / (SELECT SUM(customer_revenue) 
+FROM customer_revenue) AS DECIMAL(5,2)) as cumulative_pct FROM customer_revenue ) 
+SELECT TOP 1 COUNT(DISTINCT CustomerID) as top_customers_for_80pct, 
+ROUND(AVG(customer_revenue), 2) as avg_customer_value 
+FROM ranked 
+WHERE cumulative_pct <= 80;
+
+--QUERY 11 Inactive Customers (Churn Risk) Shows: Customers who haven't bought in 90+ days
+WITH last_purchase AS 
+( 
+    SELECT CustomerID, MAX(CAST(InvoiceDate AS DATETIME)) as last_purchase_date 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+    GROUP BY CustomerID ) 
+    SELECT COUNT(*) as inactive_90days, 
+    COUNT(CASE WHEN DATEDIFF(DAY, last_purchase_date, '2011-12-09') > 180 THEN 1 END) as inactive_180days, 
+    COUNT(CASE WHEN DATEDIFF(DAY, last_purchase_date, '2011-12-09') > 365 THEN 1 END) as inactive_1year 
+    FROM last_purchase WHERE DATEDIFF(DAY, last_purchase_date, '2011-12-09') > 90;
+
+--QUERY 12 Top 15 Products by Revenue Shows: Best selling products
+SELECT TOP 15 StockCode, Description, 
+COUNT(DISTINCT InvoiceNo) as num_orders, 
+SUM(CAST(Quantity AS INT)) as qty_sold, 
+ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as revenue 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+GROUP BY StockCode, 
+Description 
+ORDER BY revenue DESC;
+
+-- QUERY 13: Order Value Distribution
+SELECT 
+    ROUND(MIN(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as min_order_value,
+    ROUND(AVG(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as avg_order_value,
+    ROUND(MAX(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as max_order_value,
+    COUNT(*) as total_line_items
+FROM MyDatabase.dbo.online_retail
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0;
+
+--QUERY 14 Orders per Month Trend Shows: Order and customer trends by month
+SELECT YEAR(CAST(InvoiceDate AS DATETIME)) as year, 
+MONTH(CAST(InvoiceDate AS DATETIME)) as month, 
+COUNT(DISTINCT InvoiceNo) as num_orders, 
+COUNT(DISTINCT CustomerID) as num_customers, 
+ROUND(COUNT(DISTINCT InvoiceNo) * 1.0 / COUNT(DISTINCT CustomerID), 2) as orders_per_customer 
+FROM MyDatabase.dbo.online_retail 
+WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 AND CustomerID IS NOT NULL 
+GROUP BY YEAR(CAST(InvoiceDate AS DATETIME)), 
+MONTH(CAST(InvoiceDate AS DATETIME)) 
+ORDER BY year DESC, month DESC;
+
+--QUERY 15 Order Value Segments (Low/Medium/High) Shows: How orders split between price ranges
+SELECT 
+    CASE WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 50 
+    THEN 'Low (< 50)' 
+    WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 200 
+    THEN 'Medium (50-200)' ELSE 'High (> 200)' END as order_value_segment, 
+    COUNT(*) as num_line_items, 
+    COUNT(DISTINCT InvoiceNo) as distinct_orders, 
+    COUNT(DISTINCT CustomerID) as num_customers, 
+    ROUND(SUM(CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT)), 2) as segment_revenue 
+    FROM MyDatabase.dbo.online_retail 
+    WHERE CAST(Quantity AS INT) > 0 AND CAST(UnitPrice AS FLOAT) > 0 
+    GROUP BY CASE WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 50 
+    THEN 'Low (< 50)' 
+    WHEN CAST(Quantity AS INT) * CAST(UnitPrice AS FLOAT) < 200 
+    THEN 'Medium (50-200)' ELSE 'High (> 200)' END 
+    ORDER BY segment_revenue DESC;
