@@ -33,7 +33,7 @@ Complete portfolio of 3 end-to-end data analytics projects analyzing 541K+ e-com
  
 ## 🛠️ Technologies
  
-SQL Server • SSIS • Power BI • T-SQL • OLE DB
+SQL Server • SSMS • Visual Studio (for SSIS) •Power BI 
  
 ## Structure
  
