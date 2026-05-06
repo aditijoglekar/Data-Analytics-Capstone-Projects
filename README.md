@@ -47,7 +47,8 @@ Interactive 3-page business intelligence dashboard with synchronized filtering
 
 **Database & SQL**
 - SQL Server
-- T-SQL
+- Microsoft SSMS
+
 
 **ETL & Data Integration**
 - SSIS (SQL Server Integration Services)
@@ -134,27 +135,6 @@ Data-Analytics-Capstone-Projects/
 
 ---
 
-## 🔗 How to Use This Repository
-
-### For Learning
-1. Start with **01-SQL-Analysis** to understand data structure and insights
-2. Review **02-ETL-Pipeline** to see data transformation process
-3. Explore **03-PowerBI-Dashboard** for visualization techniques
-
-### For Interview Preparation
-1. Review each project's README for talking points
-2. Understand the business context and insights
-3. Be ready to explain your approach and findings
-4. Practice discussing technical implementations
-
-### For Job Applications
-1. Include this GitHub link on your resume
-2. Share link in LinkedIn profile
-3. Reference specific projects in cover letters
-4. Use metrics in interview discussions
-
----
-
 ## 📊 SQL Queries Included (15 Total)
 
 1. Total Revenue & Business Metrics
@@ -192,8 +172,7 @@ Data-Analytics-Capstone-Projects/
 ## 📧 Contact & Links
 
 - **GitHub:** https://github.com/aditjoglekar/Data-Analytics-Capstone-Projects
-- **LinkedIn:** [Your LinkedIn Profile]
-- **Email:** your-email@gmail.com
+- **LinkedIn:** www.linkedin.com/in/aditi-joglekar-a02b4b247
 
 ---
 
@@ -277,4 +256,3 @@ This project is open source and available for educational purposes.
 
 ---
 
-**Happy Learning! Good luck with your data analytics journey! 🚀**
